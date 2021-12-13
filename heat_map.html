@@ -1,0 +1,295 @@
+<!--
+  Copyright 2019, Bart Butenaers
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+  http://www.apache.org/licenses/LICENSE-2.0
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+-->
+
+<script type="text/javascript">
+    RED.nodes.registerType('ui_heat_map',{
+        category: 'dashboard',
+        color: 'rgb( 63, 173, 181)',
+        defaults: {
+            group: {type: 'ui_group', required:true},
+            order: {value: 0},
+            width: {
+                value: 0,
+                validate: function(v) {
+                    var valid = true
+                    var width = v||0;
+                    var currentGroup = $('#node-input-group').val()|| this.group;
+                    var groupNode = RED.nodes.node(currentGroup);
+                    valid = !groupNode || +width <= +groupNode.width;
+                    $("#node-input-size").toggleClass("input-error",!valid);
+                    return valid;
+                }},
+            height: {value: 0},
+            name: {value: ''},
+            // The same defaults will be shown here, as in the heatmap.js repository on Github.
+            // https://github.com/pa7/heatmap.js/blob/4e64f5ae5754c84fea363f0fcf24bea4795405ff/build/heatmap.js#L23
+            rows: {value: 0, required: true},
+            columns: {value: 0, required: true},
+            minMax: {value: false},
+            minimumValue: {value: 0},
+            maximumValue: {value: 0},
+            backgroundType: {value: "color"},
+            backgroundColor: {value: '#ffffff'},
+            image: {value: "never"},
+            radius: {value: 40},
+            opacity: {value: 0.6},
+            blur: {value: 0.85},
+            showValues: {value: false}, // Legacy (not used anymore, but keep it for checkbox value from older flows!)
+            gridType: {value: ""}, // Replacement of 'showValues'
+            valuesDecimals: {value: 0},
+            showLegend: {value: false}, // Legacy (not used anymore, but keep it for checkbox value from older flows!)
+            legendType: {value: ""}, // Replacement of 'showLegend'
+            legendDecimals: {value: 0},
+            legendCount: {value: 2}
+        },
+        inputs:1,
+        outputs:1,
+        icon: "heatmap.png",
+        align: 'right',
+        paletteLabel:"heat map",
+        label: function() {
+            return this.name || "heat map";
+        },
+        oneditprepare: function() {
+            // For existing nodes the backgroundType should be 'color'
+            if (!this.backgroundType) {
+                this.backgroundType = "color";
+            }
+            
+            // For existing nodes the image should be 'never'
+            if (!this.image) {
+                $("#node-input-image").val("never");
+            }
+        
+            // When loading a heatmap version 2.0.0 or older, there was a checkbox 'showValues' that showed numeric values (on top of the heatmap).
+            // Let's convert that checkbox now to a dropdown value.
+            if (!this.gridType) {
+                if (this.showValues === true) {
+                    this.gridType = "vals";
+                }
+                else {
+                    this.gridType = "none";
+                }
+                
+                $("#node-input-gridType").val(this.gridType);
+            }
+            
+            // When loading a heatmap version 2.0.0 or older, there was a checkbox 'showLegend' that showed numeric values (in a legend).
+            // Let's convert that checkbox now to a dropdown value.
+            if (!this.legendType) {
+                if (this.showLegend === true) {
+                    this.legendType = "vals";
+                }
+                else {
+                    this.legendType = "none";
+                }
+                
+                $("#node-input-legendType").val(this.legendType);
+            }
+            
+            $("#node-input-size").elementSizer({
+                width: "#node-input-width",
+                height: "#node-input-height",
+                group: "#node-input-group"
+            });
+            
+            // Show the color fields (for the background) only when the background type is 'color'
+            $("#node-input-backgroundType").change(function() {
+                if ($(this).val() === "color") {
+                    $(".node-input-backgroundColor-row").show();
+                } else {
+                    $(".node-input-backgroundColor-row").hide();
+                }
+            });
+            
+            // Show the input fields (for minimum and maximum) only when the checkbox is checked
+            $("#node-input-minMax").change(function() {
+                if ($(this).is(":checked")) {
+                    $(".node-input-minMax-row").show();
+                } else {
+                    $(".node-input-minMax-row").hide();
+                }
+            });
+            
+            // Show the legend fields only when numeric values are showed in a legend
+            $("#node-input-legendType").change(function() {
+                if ($(this).val() === "vals") {
+                    $(".node-input-legend-row").show();
+                } else {
+                    $(".node-input-legend-row").hide();
+                }
+            });
+            
+            // Show the values fields only when numeric values are showed on top of the heatmap
+            $("#node-input-gridType").change(function() {
+                if ($(this).val() === "vals") {
+                    $(".node-input-values-row").show();
+                } else {
+                    $(".node-input-values-row").hide();
+                }
+            });
+        }
+    });
+</script>
+
+<script type="text/x-red" data-template-name="ui_heat_map">
+    <div class="form-row" id="template-row-group">
+        <label for="node-input-group"><i class="fa fa-table"></i> Group</span></label>
+        <input type="text" id="node-input-group">
+    </div>    
+    <div class="form-row" id="template-row-size">
+        <label><i class="fa fa-object-group"></i> Size</span></label>
+        <input type="hidden" id="node-input-width">
+        <input type="hidden" id="node-input-height">
+        <button class="editor-button" id="node-input-size"></button>
+    </div>
+    <div class="form-row">
+        <label for="node-input-rows"><i class="fa fa-arrows-alt"></i> Grid size</label>
+        <span for="node-input-rows">Rows</span>
+        <input type="text" id="node-input-rows" style="width:80px" min="1">
+        <span for="node-input-columns" style="margin-left:20px;"> Columns</span>
+        <input type="text" id="node-input-columns" style="width:80px" min="1">
+    </div>
+    <div class="form-row">    
+        <input type="checkbox" id="node-input-minMax" style="display: inline-block; width: auto; vertical-align: top;">
+        <label for="node-input-minMax" style="width:70%;"> Specify minimum and maximum value</label>
+        <div style="margin-left: 20px" class="node-input-minMax-row hide">
+            <div class="form-row">
+                <span for="node-input-minimumValue">Minimum</span>
+                <input type="text" id="node-input-minimumValue" style="width:80px">
+                <span for="node-input-maximumValue" style="margin-left:20px;">Maximum</span>
+                <input type="text" id="node-input-maximumValue" style="width:80px">
+            </div>
+        </div>
+    </div>
+    <div class="form-row">
+        <div class="form-row">
+            <label for="node-input-gridType"><i class="fa fa-th"></i> Grid values</label>
+            <select id="node-input-gridType">
+                <option value="none">None</option>
+                <option value="keys">Keys</option>
+                <option value="vals">Values</option>           
+            </select>
+        </div>
+        <div style="margin-left: 20px" class="node-input-values-row hide">
+            <div class="form-row">
+                <label for="node-input-valuesDecimals"> Decimals</label>
+                <input type="number" id="node-input-valuesDecimals" min="0">
+            </div>
+        </div>
+    </div>
+    <div class="form-row">
+        <div class="form-row">
+            <label for="node-input-legendType"><i class="fa fa-barcode"></i> Legend</label>
+            <select id="node-input-legendType">
+                <option value="none">None</option>
+                <option value="vals">Values</option>           
+            </select>
+        </div>
+        <div style="margin-left: 20px" class="node-input-legend-row hide">
+            <div class="form-row">
+                <label for="node-input-legendCount"> Dimension</label>
+                <input type="number" id="node-input-legendCount" min="2">
+            </div>
+            <div class="form-row">
+                <label for="node-input-legendDecimals"> Decimals</label>
+                <input type="number" id="node-input-legendDecimals" min="0">
+            </div>
+        </div>
+    </div>
+    <div class="form-row">
+        <div class="form-row">
+            <label for="node-input-backgroundType"><i class="fa fa-picture-o"></i> Background</label>
+            <select id="node-input-backgroundType">
+                <option value="none">None (transparent)</option>
+                <option value="color">Fixed color</option>
+                <option value="image">Image</option>           
+            </select>
+        </div>
+        <div style="margin-left: 20px" class="node-input-backgroundColor-row hide">
+            <label for="node-input-backgroundColor"><i class="fa fa-paint-brush"></i> Color</span></label>
+            <input type="color" id="node-input-backgroundColor"/>
+        </div>
+    </div>
+    <div class="form-row">
+        <label for="node-input-image"><i class="fa fa-picture-o"></i> Snapshot</label>
+        <select id="node-input-image">
+            <option value="never">Never</option> 
+            <option value="always">Always</option>
+            <option value="request">At request</option>
+        </select>
+    </div>
+    <div class="form-row">
+        <label for="node-input-radius"><i class="fa fa-bullseye"></i> Radius</span></label>
+        <input type="number" id="node-input-radius" min="0"/>
+    </div>      
+    <div class="form-row">
+        <label for="node-input-opacity"><i class="fa fa-glass"></i> Opacity</span></label>
+        <input type="number" id="node-input-opacity" min="0" max="1"/>
+    </div>  
+    <div class="form-row">
+        <label for="node-input-blur"><i class="fa fa-low-vision"></i> Blur</span></label>
+        <input type="number" id="node-input-blur" min="0" max="1"/>
+    </div>
+    </br>
+    <div class="form-row">
+        <label for="node-input-name"><i class="icon-tag"></i> Name</label>
+        <input type="text" id="node-input-name" placeholder="Name">
+    </div>
+</script>
+<script type="text/x-red" data-help-name="ui_heat_map">
+    <p>A Node Red node to show a heat map.</p>
+    <p>A heatmap is a graphical representation of data, where the individual values contained in a matrix are represented as colors.  See my <a target="_blank" href="https://github.com/bartbutenaers/node-red-contrib-ui-heatmap/">readme page</a> for more information</p>
+    <p><strong>Grid size (rows & columns):</strong><br/>
+    Define the number of rows and columns, for the matrix that will contain all the individual numeric values (which will be represented visually as colors in the heatmap).  These settings can be overridden by <code>msg.rows</code> and <code>msg.columns</code></p>
+    <p><strong>Specify minimum and maximum value:</strong><br/>
+    Low numeric input numbers will be represented in the heatmap as <font color="blue">blue</font>, while high numeric numbers will be represented as <font color="red">red</font>.  All other numbers in between will be represented by intermediate colors.  There are three ways to specify the minimum and maximum numbers:
+    <ul>
+        <li>When this checkbox is selected, then the minimum and maximum numbers need to be specified manually.  This is the most precise method, but you need to know the values in advance.</li>
+        <li>When this checkbox is unselected, then the values can be specified in the input message as <code>msg.minimum</code> and <code>msg.maximum</code>.</li>
+        <li>When this checkbox is unselected and no limits are specified in the input message, the node will calculate automatically the minimum and maximum.  This is the simplest solution, but the colors might be a bit incorrect.  Indeed when the input numbers don't contain the highest and lowest numbers, then the colors will deviate a bit from the real situation.</li>
+    </ul></p>
+    <p><strong>Grid values:</strong><br/>
+    Specify which data (from the matrix of input values in <code>msg.payload</code>) will be drawn on top of the heatmap:
+    <ul>
+        <li><i>None:</i> no data will be drawn.</li>
+        <li><i>Values:</i> the numeric values will be drawn.</li>
+        <li><i>Keys:</i> the key values will be drawn.</li>
+    </ul></p>
+    <p><strong>Legend:</strong><br/>
+    Specify which data (from the matrix of input values) will be drawn in a legend:
+    <ul>
+        <li><i>None:</i> no data will be drawn.</li>
+        <li><i>Values:</i> the numeric values will be drawn.</li>
+    </ul></p>
+    <p><strong>Background color:</strong><br/>
+    Specify which data will be drawn behind the heatmap:
+    <ul>
+        <li><i>None:</i> no data will be drawn, which means the background will be transparent.</li>
+        <li><i>Fixed color:</i> the specified color will be drawn in the background.</li>
+        <li><i>Image:</i> an image will be drawn (stretched) as background.  That background image can be specified via <code>msg.image</code>.  Make sure the opacity is set to 0.</li>
+    </ul></p>
+    <p><strong>Snapshot:</strong><br/>
+    Specify whether a (base64 encoded) jpeg snapshot image (of the heatmap) should be send in an output message:
+    <ul>
+        <li><i>Never:</i> the image will never be created or send.</li>
+        <li><i>Always:</i> the image will be created and send for every input message.</li>
+        <li><i>At request:</i> the image will only be created when an input message with <code>msg.snapshot=true</code> arrives.</li>
+    </ul></p>
+    <p><strong>Radius:</strong><br/>
+    Each point in the matrix will have a radius, to avoid a blocky map for low-resolution matrices.</p>    
+    <p><strong>Opacity:</strong><br/>
+    The opacity of the heatmap defines the transparency of the colors, and will be a value between 0 and 1.</p> 
+    <p><strong>Blur:</strong><br/>
+    The higher the blur is, the smoother the color gradients will become.  The blur will be a value between 0 and 1.</p>
+</script>
