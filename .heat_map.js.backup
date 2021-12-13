@@ -85,9 +85,7 @@ module.exports = function(RED) {
                         
                         // When there is a payload, it should be an array.
                         // It could be that there is no payload, e.g. when only a background image is being set
-                        console.log(msg.payload, msg.payload.length)
                         if (msg.payload) {
-                            console.log(msg.payload, msg.payload.length)
                             if (!Array.isArray(msg.payload)) {
                                 node.error("The msg.payload should contain an array");
                                 msg.payload = null;

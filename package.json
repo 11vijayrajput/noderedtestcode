@@ -3,7 +3,8 @@
   "version": "2.2.1",
   "description": "A Node Red node to show a heat map",
   "dependencies": {
-    "node-red-contrib-ui-heatmap": "^2.2.1"
+    "node-red-contrib-ui-heatmap": "^2.2.1",
+    "node-red-node-base64": "^0.3.0"
   },
   "author": {
     "name": "Bart Butenaers"
